@@ -322,8 +322,9 @@
                 <button id="input-start">Input Starting Position</button>
                 <button id="input-sequence">Input Move Sequence</button>
                 <div class="spacer"></div>
+                <button id="generate-cube">Generate Random Cube</button>
                 <button id="reset-view">Reset 3D View</button>
-                <button id="reset-cube">Reset Cube</button>
+                <button id="reset-cube">Reset to Solved Cube</button>
             </div>
         </div>
 
@@ -850,6 +851,47 @@
             resetCube();
         }
     });
+
+    document.getElementById("generate-cube").addEventListener("click", () => {
+        if (confirm("Generate random cube?")) {
+            resetCube();
+
+            const BASIC_MOVES = ["U", "D", "L", "R", "F", "B"];
+            const MOVE_SUFFIXES = ["", "i", "2"]; // normal, inverse, double
+
+            function generateRandomScramble(length = 25) {
+                const scramble = [];
+                let lastMove = null;
+
+                for (let i = 0; i < length; i++) {
+                    let move;
+
+                    do {
+                        const base = BASIC_MOVES[Math.floor(Math.random() * BASIC_MOVES.length)];
+                        const suffix = MOVE_SUFFIXES[Math.floor(Math.random() * MOVE_SUFFIXES.length)];
+                        move = base + suffix;
+                    } while (lastMove && lastMove[0] === move[0]); // avoid same-face repeats
+
+                    scramble.push(move);
+                    lastMove = move;
+                }
+
+                return scramble;
+            }
+
+
+
+            const scramble = generateRandomScramble(25);
+
+            for (const move of scramble) {
+                moveHandlers[move](cube); // faster than applyMove (no re-render per move)
+            }
+
+            moveHistory.length = 0;
+            renderAll();
+            renderMoveHistory();
+        }
+    })
 
     document.getElementById("input-start").addEventListener("click", () => {
         promptAndDoMoves(true)
