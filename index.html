@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Rubik's Cube</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: sans-serif;
+            background: #ccc;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            gap: 40px;
+            padding: 20px;
+        }
+
+        #cube-visuals {
+            display: flex;
+            gap: 40px 150px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        #reset-view {
+            width: 100%;
+        }
+
+        #cube-net {
+            display: grid;
+            grid-template-columns: repeat(4, auto);
+            grid-template-rows: repeat(3, 120px);
+            justify-items: center;
+        }
+
+        .middle-row {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .side-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .label {
+            margin-bottom: 4px;
+            font-size: 12px;
+        }
+
+        .side {
+            display: grid;
+            grid-template-columns: repeat(3, 30px);
+            grid-template-rows: repeat(3, 30px);
+            background: black;
+        }
+
+        .tile {
+            width: 29px;
+            height: 29px;
+            border: 1px solid black;
+            border-radius: 2px;
+            position: relative;
+        }
+
+        .face-label {
+            display: none;
+            position: absolute;
+            inset: 0;
+
+            align-items: center;
+            justify-content: center;
+
+            font-size: 14px;
+            font-weight: bold;
+            color: rgba(0, 0, 0, 0.7);
+
+            pointer-events: none;
+            user-select: none;
+        }
+
+        .show-labels .face-label {
+            display: flex;
+        }
+
+        #cube-3d .face-label {
+            margin-bottom: 30px;
+        }
+
+        #cube-3d-wrapper {
+            width: 300px;
+            height: 300px;
+            perspective: 800px;
+            --cube-size: 213px;
+            --half-cube-size: 130px;
+            --sticker-radius: calc(var(--cube-size) / 40);
+        }
+
+        #cube-3d {
+            width: var(--cube-size);
+            height: var(--cube-size);
+            margin: 45px auto;
+            transform-style: preserve-3d;
+            transform: rotateX(-20deg) rotateY(40deg);
+        }
+
+        #cube-axes {
+            position: absolute;
+            inset: 0;
+            transform-style: preserve-3d;
+            pointer-events: none;
+        }
+
+        .show-axes .axis {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform-origin: center;
+            pointer-events: none;
+            border-radius: 50%;
+
+            box-shadow:
+                    inset -1px -1px 2px rgba(0,0,0,0.4),
+                    inset  1px  1px 2px rgba(255,255,255,0.4),
+                    0 0 4px rgba(0,0,0,0.3);
+        }
+
+        .show-axes .axis-x {
+            width: calc(var(--cube-size) * 1.6);
+            height: 10px;
+            transform: translate(-50%, -50%);
+        }
+
+        .show-axes .axis-y {
+            width: 10px;
+            height: calc(var(--cube-size) * 1.6);
+            transform: translate(-50%, -50%);
+        }
+
+        .show-axes .axis-z {
+            width: 10px;
+            height: calc(var(--cube-size) * 1.6);
+            transform: translate(-50%, -50%) rotateX(90deg);
+        }
+
+        .face {
+            position: absolute;
+            display: grid;
+            grid-template-columns: repeat(3, calc(var(--cube-size) / 3));
+            grid-template-rows: repeat(3, calc(var(--cube-size) / 3));
+            background: black;
+        }
+
+        .face .tile {
+            border-radius: var(--sticker-radius);
+            width: calc(var(--cube-size) / 3);
+            height: calc(var(--cube-size) / 3);
+        }
+
+        .face.top    { transform: rotateX(90deg) rotateZ(90deg) translateZ(var(--half-cube-size)); }
+        .face.left   { transform: rotateY(180deg) translateZ(var(--half-cube-size)); }
+        .face.front   { transform: rotateY(-90deg) translateZ(var(--half-cube-size)); }
+        .face.right  { transform: translateZ(var(--half-cube-size)); }
+        .face.back  { transform: rotateY(90deg) translateZ(var(--half-cube-size)); }
+        .face.bottom { transform: rotateX(-90deg) rotateZ(-90deg) translateZ(var(--half-cube-size)); }
+
+        .color--red { background: rgb(199, 8, 5); }
+        .color--green { background: rgb(21, 251, 0); }
+        .color--yellow { background: rgb(246, 251, 0); }
+        .color--blue { background: rgb(31, 1, 255); }
+        .color--orange { background: rgb(255, 119, 0); }
+        .color--white { background: rgb(226, 221, 221); }
+
+        #controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: flex-start;
+            justify-content: center;
+            margin-top: 30px;
+        }
+
+        .controls-section {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+        }
+
+        .controls-header {
+            flex-basis: 100%;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 600;
+            color: #444;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+
+        .controls-header::after {
+            content: "";
+            display: block;
+            width: 150px;
+            height: 1px;
+            background: #aaa;
+            margin: 3px auto 0;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .control-row button {
+            white-space: nowrap;
+        }
+
+        .controls-description {
+            flex-basis: 100%;
+            font-size: 12px;
+            color: #555;
+            line-height: 1.4;
+            text-align: center;
+        }
+
+        .spacer { margin-right: 20px; }
+
+        #move-history {
+            font-size: 12px;
+        }
+
+        .controls-general button {
+            width: 100%;
+        }
+
+        button {
+            width: 48px;
+            height: 36px;
+            border-radius: 6px;
+            border: 1px solid #aaa;
+            background: #f2f2f2;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background: #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app" class="show-axes show-labels">
+
+    <div id="cube-visuals">
+        <div id="cube-net">
+            <div class="side-wrapper top" style="grid-column: 2;">
+                <div class="label">Top</div>
+                <div class="side" data-side="TOP"></div>
+            </div>
+
+            <div class="middle-row" style="grid-column: 1 / span 4;">
+                <div class="side-wrapper">
+                    <div class="label">Left</div>
+                    <div class="side" data-side="LEFT"></div>
+                </div>
+
+                <div class="side-wrapper">
+                    <div class="label">Front</div>
+                    <div class="side" data-side="FRONT"></div>
+                </div>
+
+                <div class="side-wrapper">
+                    <div class="label">Right</div>
+                    <div class="side" data-side="RIGHT"></div>
+                </div>
+
+                <div class="side-wrapper">
+                    <div class="label">Back</div>
+                    <div class="side" data-side="BACK"></div>
+                </div>
+            </div>
+
+            <div class="side-wrapper bottom" style="grid-column: 2;">
+                <div class="label">Bottom</div>
+                <div class="side" data-side="BOTTOM"></div>
+            </div>
+        </div>
+
+        <div id="cube-3d-wrapper">
+            <div id="cube-3d">
+                <div class="face front"  data-side="FRONT"></div>
+                <div class="face back"   data-side="BACK"></div>
+                <div class="face right"  data-side="RIGHT"></div>
+                <div class="face left"   data-side="LEFT"></div>
+                <div class="face top"    data-side="TOP"></div>
+                <div class="face bottom" data-side="BOTTOM"></div>
+
+                <div id="cube-axes">
+                    <div class="axis axis-x move" data-move="X"></div>
+                    <div class="axis axis-y move" data-move="Y"></div>
+                    <div class="axis axis-z move" data-move="Z"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="controls">
+        <div class="controls-section">
+            <div class="controls-header">Settings</div>
+
+            <div class="control-row controls-general">
+                <button id="toggle-labels">Hide Labels</button>
+                <button id="toggle-axes">Hide Axes</button>
+                <div class="spacer"></div>
+                <button id="input-start">Input Starting Position</button>
+                <button id="input-sequence">Input Move Sequence</button>
+                <div class="spacer"></div>
+                <button id="reset-view">Reset 3D View</button>
+                <button id="reset-cube">Reset Cube</button>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <div class="controls-header">Moves</div>
+
+            <div class="control-row">
+                <button class="move" data-move="U">U</button>
+                <button class="move" data-move="U">U'</button>
+                <button class="move" data-move="U">U2</button>
+            </div>
+            <div class="control-row">
+                <button class="move" data-move="L">L</button>
+                <button class="move" data-move="L">L'</button>
+                <button class="move" data-move="L">L2</button>
+            </div>
+            <div class="control-row">
+                <button class="move" data-move="F">F</button>
+                <button class="move" data-move="F">F'</button>
+                <button class="move" data-move="F">F2</button>
+            </div>
+            <div class="control-row">
+                <button class="move" data-move="R">R</button>
+                <button class="move" data-move="R">R'</button>
+                <button class="move" data-move="R">R2</button>
+            </div>
+            <div class="control-row">
+                <button class="move" data-move="B">B</button>
+                <button class="move" data-move="B">B'</button>
+                <button class="move" data-move="B">B2</button>
+            </div>
+            <div class="control-row">
+                <button class="move" data-move="D">D</button>
+                <button class="move" data-move="D">D'</button>
+                <button class="move" data-move="D">D2</button>
+            </div>
+        </div>
+
+        <div class="controls-section">
+            <div class="controls-header">Rotations</div>
+
+            <div class="control-row">
+                <button class="move" data-move="X">X</button>
+                <button class="move" data-move="X">X'</button>
+                <button class="move" data-move="X">X2</button>
+            </div>
+            <div class="control-row">
+                <button class="move" data-move="Y">Y</button>
+                <button class="move" data-move="Y">Y'</button>
+                <button class="move" data-move="Y">Y2</button>
+            </div>
+            <div class="control-row">
+                <button class="move" data-move="Z">Z</button>
+                <button class="move" data-move="Z">Z'</button>
+                <button class="move" data-move="Z">Z2</button>
+            </div>
+        </div>
+
+        <div class="controls-description">
+            As an alternative to the buttons, you can also use the following keybindings:
+            <strong>U, L, F, R, B, D, X, Y, Z</strong>. <br/>
+            Modifier <strong>Shift</strong> will inverse the move. Modifier <strong>Ctrl</strong> will do a double move.
+        </div>
+
+        <div class="controls-section">
+            <div class="controls-header">Move History</div>
+            <div id="move-history"></div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const CUBE_COLORS = {
+        RED: "RED",
+        GREEN: "GREEN",
+        YELLOW: "YELLOW",
+        BLUE: "BLUE",
+        ORANGE: "ORANGE",
+        WHITE: "WHITE"
+    };
+    const FACE_LABELS = {
+        FRONT: "F",
+        BACK: "B",
+        LEFT: "L",
+        RIGHT: "R",
+        TOP: "U",
+        BOTTOM: "D"
+    };
+    const MOVE_TO_FACE = {
+        U: "TOP",
+        D: "BOTTOM",
+        L: "LEFT",
+        R: "RIGHT",
+        F: "FRONT",
+        B: "BACK",
+
+        // axes match the ones they're going through
+        X: "FRONT",
+        Y: "TOP",
+        Z: "RIGHT",
+    };
+
+    const cube = createSolvedCube();
+
+    function createSolvedCube() {
+        return {
+            TOP:    createSide(CUBE_COLORS.YELLOW),
+            BOTTOM: createSide(CUBE_COLORS.WHITE),
+            LEFT:   createSide(CUBE_COLORS.GREEN),
+            RIGHT:  createSide(CUBE_COLORS.BLUE),
+            FRONT:  createSide(CUBE_COLORS.ORANGE),
+            BACK:   createSide(CUBE_COLORS.RED)
+        }
+    }
+
+    function createSide(color) {
+        return [
+            [color, color, color],
+            [color, color, color],
+            [color, color, color]
+        ];
+    }
+
+    function resetCube() {
+        Object.assign(cube, createSolvedCube());
+        moveHistory.length = 0;
+        renderAll();
+    }
+
+    function rotateArrayClockwise(array) {
+        const n = array.length;
+        const rotated = Array.from({ length: n }, () => Array(n));
+
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                rotated[i][j] = array[n - 1 - j][i];
+            }
+        }
+        return rotated;
+    }
+
+    function rotateArrayCounterClockwise(array) {
+        const n = array.length;
+        const rotated = Array.from({ length: n }, () => Array(n));
+
+        for (let i = 0; i < n; i++) {
+            for (let j = 0; j < n; j++) {
+                rotated[i][j] = array[j][n - 1 - i];
+            }
+        }
+        return rotated;
+    }
+
+    function inverseArray(array) {
+        return [...array].reverse();
+    }
+
+    function getRow(side, row) {
+        return [...side[row]];
+    }
+
+    function setRow(side, row, values) {
+        side[row] = [...values];
+    }
+
+    function getColumn(side, col) {
+        return side.map(r => r[col]);
+    }
+
+    function setColumn(side, col, values) {
+        for (let i = 0; i < side.length; i++) {
+            side[i][col] = values[i];
+        }
+    }
+
+    const moveHistory = [];
+    const moveHandlers = {
+        U: cube => repeat(() => rotateU(cube), 1),
+        U2: cube => repeat(() => rotateU(cube), 2),
+        Ui: cube => repeat(() => rotateU(cube), 3),
+        L: cube => repeat(() => rotateL(cube), 1),
+        L2: cube => repeat(() => rotateL(cube), 2),
+        Li: cube => repeat(() => rotateL(cube), 3),
+        F:  cube => repeat(() => rotateF(cube), 1),
+        F2: cube => repeat(() => rotateF(cube), 2),
+        Fi: cube => repeat(() => rotateF(cube), 3),
+        R: cube => repeat(() => rotateR(cube), 1),
+        R2: cube => repeat(() => rotateR(cube), 2),
+        Ri: cube => repeat(() => rotateR(cube), 3),
+        B: cube => repeat(() => rotateB(cube), 1),
+        B2: cube => repeat(() => rotateB(cube), 2),
+        Bi: cube => repeat(() => rotateB(cube), 3),
+        D: cube => repeat(() => rotateD(cube), 1),
+        D2: cube => repeat(() => rotateD(cube), 2),
+        Di: cube => repeat(() => rotateD(cube), 3),
+
+        X: cube => repeat(() => rotateX(cube), 1),
+        X2: cube => repeat(() => rotateX(cube), 2),
+        Xi: cube => repeat(() => rotateX(cube), 3),
+        Y: cube => repeat(() => rotateY(cube), 1),
+        Y2: cube => repeat(() => rotateY(cube), 2),
+        Yi: cube => repeat(() => rotateY(cube), 3),
+        Z: cube => repeat(() => rotateZ(cube), 1),
+        Z2: cube => repeat(() => rotateZ(cube), 2),
+        Zi: cube => repeat(() => rotateZ(cube), 3),
+    };
+    function repeat(fn, times) {
+        for (let i = 0; i < times; i++) fn();
+    }
+
+    function rotateU(cube) {
+        const size = cube.TOP.length;
+
+        cube.TOP = rotateArrayClockwise(cube.TOP);
+
+        const left  = cube.LEFT;
+        const back  = cube.BACK;
+        const right = cube.RIGHT;
+        const front = cube.FRONT;
+
+        const leftEdge  = getRow(left, 0);
+        const backEdge  = getRow(back, 0);
+        const rightEdge = getRow(right, 0);
+        const frontEdge = getRow(front, 0);
+
+        setRow(left,  0, frontEdge);
+        setRow(back,  0, leftEdge);
+        setRow(right, 0, backEdge);
+        setRow(front, 0, rightEdge);
+    }
+
+    function rotateL(cube) {
+        const size = cube.LEFT.length;
+
+        cube.LEFT = rotateArrayClockwise(cube.LEFT);
+
+        const back   = cube.BACK;
+        const top    = cube.TOP;
+        const front  = cube.FRONT;
+        const bottom = cube.BOTTOM;
+
+        const backEdge   = getColumn(back, size - 1);
+        const topEdge    = getColumn(top, 0);
+        const frontEdge  = getColumn(front, 0);
+        const bottomEdge = getColumn(bottom, 0);
+
+        setColumn(back,   size - 1, inverseArray(bottomEdge));
+        setColumn(top,    0,        inverseArray(backEdge));
+        setColumn(front,  0,        topEdge);
+        setColumn(bottom,0,        frontEdge);
+    }
+
+    function rotateF(cube) {
+        const size = cube.FRONT.length;
+
+        cube.FRONT = rotateArrayClockwise(cube.FRONT);
+
+        const left   = cube.LEFT;
+        const top    = cube.TOP;
+        const right  = cube.RIGHT;
+        const bottom = cube.BOTTOM;
+
+        const leftEdge   = getColumn(left, size - 1);
+        const topEdge    = getRow(top, size - 1);
+        const rightEdge  = getColumn(right, 0);
+        const bottomEdge = getRow(bottom, 0);
+
+        setColumn(left, size - 1, bottomEdge);
+        setRow(top, size - 1, inverseArray(leftEdge));
+        setColumn(right, 0, topEdge);
+        setRow(bottom, 0, inverseArray(rightEdge));
+    }
+
+    function rotateR(cube) {
+        const size = cube.RIGHT.length;
+
+        cube.RIGHT = rotateArrayClockwise(cube.RIGHT);
+
+        const front  = cube.FRONT;
+        const top    = cube.TOP;
+        const back   = cube.BACK;
+        const bottom = cube.BOTTOM;
+
+        const frontEdge  = getColumn(front, size - 1);
+        const topEdge    = getColumn(top, size - 1);
+        const backEdge   = getColumn(back, 0);
+        const bottomEdge = getColumn(bottom, size - 1);
+
+        setColumn(front,  size - 1, bottomEdge);
+        setColumn(top,    size - 1, frontEdge);
+        setColumn(back,   0,        inverseArray(topEdge));
+        setColumn(bottom, size - 1, inverseArray(backEdge));
+    }
+
+    function rotateB(cube) {
+        const size = cube.BACK.length;
+
+        cube.BACK = rotateArrayClockwise(cube.BACK);
+
+        const right  = cube.RIGHT;
+        const top    = cube.TOP;
+        const left   = cube.LEFT;
+        const bottom = cube.BOTTOM;
+
+        const rightEdge  = getColumn(right, size - 1);
+        const topEdge    = getRow(top, 0);
+        const leftEdge   = getColumn(left, 0);
+        const bottomEdge = getRow(bottom, size - 1);
+
+        setColumn(right, size - 1, inverseArray(bottomEdge));
+        setRow(top,      0,        rightEdge);
+        setColumn(left,  0,        inverseArray(topEdge));
+        setRow(bottom,   size - 1, leftEdge);
+    }
+
+    function rotateD(cube) {
+        const size = cube.BOTTOM.length;
+
+        cube.BOTTOM = rotateArrayClockwise(cube.BOTTOM);
+
+        const left  = cube.LEFT;
+        const front = cube.FRONT;
+        const right = cube.RIGHT;
+        const back  = cube.BACK;
+
+        const leftEdge  = getRow(left, size - 1);
+        const frontEdge = getRow(front, size - 1);
+        const rightEdge = getRow(right, size - 1);
+        const backEdge  = getRow(back, size - 1);
+
+        setRow(left,  size - 1, backEdge);
+        setRow(front, size - 1, leftEdge);
+        setRow(right, size - 1, frontEdge);
+        setRow(back,  size - 1, rightEdge);
+    }
+
+    function rotateX(cube) {
+        const front  = cube.FRONT;
+        const right  = cube.RIGHT;
+        const top    = cube.TOP;
+        const left   = cube.LEFT;
+        const back   = cube.BACK;
+        const bottom = cube.BOTTOM;
+
+        cube.TOP    = front;
+        cube.FRONT  = bottom;
+        cube.LEFT   = rotateArrayCounterClockwise(left);
+        cube.RIGHT  = rotateArrayClockwise(right);
+        cube.BOTTOM = rotateArrayClockwise(rotateArrayClockwise(back));
+        cube.BACK   = rotateArrayClockwise(rotateArrayClockwise(top));
+    }
+
+    function rotateY(cube) {
+        const front  = cube.FRONT;
+        const right  = cube.RIGHT;
+        const top    = cube.TOP;
+        const left   = cube.LEFT;
+        const back   = cube.BACK;
+        const bottom = cube.BOTTOM;
+
+        cube.LEFT   = front;
+        cube.FRONT  = right;
+        cube.RIGHT  = back;
+        cube.BACK   = left;
+        cube.TOP    = rotateArrayClockwise(top);
+        cube.BOTTOM = rotateArrayCounterClockwise(bottom);
+    }
+
+    function rotateZ(cube) {
+        const front  = cube.FRONT;
+        const right  = cube.RIGHT;
+        const top    = cube.TOP;
+        const left   = cube.LEFT;
+        const back   = cube.BACK;
+        const bottom = cube.BOTTOM;
+
+        cube.TOP    = rotateArrayClockwise(left);
+        cube.FRONT  = rotateArrayClockwise(front);
+        cube.LEFT   = rotateArrayClockwise(bottom);
+        cube.RIGHT  = rotateArrayClockwise(top);
+        cube.BOTTOM = rotateArrayClockwise(right);
+        cube.BACK   = rotateArrayCounterClockwise(back);
+    }
+
+
+    function buildMove(baseMove, event) {
+        // Ctrl = double move
+        if (event.ctrlKey) {
+            return baseMove + "2";
+        }
+
+        // Shift = inverse
+        if (event.shiftKey) {
+            return baseMove + "i";
+        }
+
+        return baseMove;
+    }
+
+    function applyMove(cube, move) {
+        const handler = moveHandlers[move];
+        if (!handler) {
+            console.warn("Unknown move:", move);
+            return;
+        }
+        handler(cube);
+        moveHistory.push(move);
+        renderAll();
+    }
+
+    function renderMoveHistory() {
+        const historyEl = document.getElementById("move-history");
+        historyEl.textContent = moveHistory
+            .map(move => move.endsWith("i")
+                ? move.slice(0, -1) + "'"
+                : move)
+            .join(" ");
+    }
+
+    window.addEventListener("keydown", e => {
+        // Ignore typing in inputs later (future-proof)
+        if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+            return;
+        }
+
+        const key = e.key.toUpperCase();
+
+        // Allowed move keys
+        const validMoves = ["L", "R", "U", "D", "F", "B", "X", "Y", "Z"];
+        if (!validMoves.includes(key)) return;
+
+        e.preventDefault();
+
+        const move = buildMove(key, e);
+        applyMove(cube, move);
+    });
+
+    document.getElementById("controls").addEventListener("click", e => {
+        if (!e.target.classList.contains("move")) return;
+
+        const move = e.target.textContent.trim().replace("'", "i");
+        applyMove(cube, move);
+    });
+
+
+    const cubeWrapper = document.getElementById("cube-3d-wrapper");
+    const cube3DEl = document.getElementById("cube-3d");
+
+    let dragging = false;
+    let startMouseX = 0;
+    let startMouseY = 0;
+
+    let rotX = -20;
+    let rotY = 40;
+
+    let lastRotX = rotX;
+    let lastRotY = rotY;
+
+    // Sensitivity
+    const sensitivity = 0.5;
+
+    cubeWrapper.addEventListener("mousedown", (e) => {
+        dragging = true;
+        startMouseX = e.clientX;
+        startMouseY = e.clientY;
+        cubeWrapper.style.cursor = "grabbing";
+    });
+
+    document.addEventListener("mouseup", () => {
+        if (!dragging) return;
+        dragging = false;
+        cubeWrapper.style.cursor = "grab";
+        lastRotX = rotX;
+        lastRotY = rotY;
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!dragging) return;
+
+        const dx = e.clientX - startMouseX;
+        const dy = e.clientY - startMouseY;
+
+        // Update rotations
+        rotY = lastRotY + dx * sensitivity;     // drag left/right → rotate Y
+        rotX = lastRotX - dy * sensitivity;     // drag up/down → rotate X
+
+        // clamp X to avoid flipping upside down
+        rotX = Math.max(-90, Math.min(90, rotX));
+
+        // Apply rotation using same order as your CSS initial transform
+        cube3DEl.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+    });
+
+    // Initial cursor
+    cubeWrapper.style.cursor = "grab";
+
+    document.getElementById("reset-view").addEventListener("click", () => {
+        const rotX = -20;
+        const rotY = 40;
+
+        // Update last rotations for drag calculations
+        lastRotX = rotX;
+        lastRotY = rotY;
+
+        // Apply transform to cube
+        cube3DEl.style.transform = `rotateX(${rotX}deg) rotateY(${rotY}deg)`;
+    });
+
+    const toggleLabelsButton = document.getElementById("toggle-labels");
+    toggleLabelsButton.addEventListener("click", () => {
+        const isActive = document.getElementById("app").classList.toggle("show-labels");
+        toggleLabelsButton.textContent = (isActive ? "Hide" : "Show") + " Labels";
+    });
+
+    const toggleAxisButton = document.getElementById("toggle-axes");
+    toggleAxisButton.addEventListener("click", () => {
+        const isActive = document.getElementById("app").classList.toggle("show-axes");
+        toggleAxisButton.textContent = (isActive ? "Hide" : "Show") + " Axes";
+    });
+
+    document.getElementById("reset-cube").addEventListener("click", () => {
+        if (confirm("Reset cube?")) {
+            resetCube();
+        }
+    });
+
+    document.getElementById("input-start").addEventListener("click", () => {
+        promptAndDoMoves(true)
+    });
+
+    document.getElementById("input-sequence").addEventListener("click", () => {
+        promptAndDoMoves(false)
+    });
+
+    function promptAndDoMoves(resetHistory) {
+        const input = prompt(
+            "Enter moves (e.g. F R' U2)",
+            ""
+        );
+
+        if (!input) return;
+
+        if (resetHistory) {
+            resetCube();
+        }
+        playMoveSequence(input);
+        if (resetHistory) {
+            moveHistory.length = 0;
+        }
+        renderAll();
+    }
+
+    function playMoveSequence(sequence) {
+        const moves = sequence
+            .trim()
+            .split(/\s+/)
+            .map(parseMove)
+            .filter(Boolean);
+
+        for (const move of moves) {
+            applyMove(cube, move);
+        }
+
+        renderAll();
+    }
+
+    function parseMove(move) {
+        // Normalize input
+        move = move.trim().toUpperCase();
+
+        // Convert F' → Fi
+        if (move.endsWith("'")) {
+            move = move.slice(0, -1) + "i";
+        }
+
+        // Validate
+        if (!moveHandlers[move]) {
+            console.warn("Invalid move:", move);
+            return null;
+        }
+
+        return move;
+    }
+
+    // render logic
+    function render2D() {
+        document.querySelectorAll(".side").forEach(sideEl => {
+            const sideName = sideEl.dataset.side;
+            const sideData = cube[sideName];
+
+            sideEl.innerHTML = "";
+
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    const tile = document.createElement("div");
+                    tile.classList.add("tile");
+                    tile.classList.add("color--" + sideData[row][col].toLowerCase());
+
+                    if (row === 1 && col === 1) {
+                        const label = document.createElement("span");
+                        label.className = "face-label";
+                        label.textContent = FACE_LABELS[sideName];
+                        tile.appendChild(label);
+                    }
+
+                    sideEl.appendChild(tile);
+                }
+            }
+        });
+    }
+
+    function render3D() {
+        document.querySelectorAll(".face").forEach(faceEl => {
+            const sideName = faceEl.dataset.side;
+            const sideData = cube[sideName];
+
+            faceEl.innerHTML = "";
+
+            for (let row = 0; row < 3; row++) {
+                for (let col = 0; col < 3; col++) {
+                    const tile = document.createElement("div");
+                    tile.classList.add("tile");
+                    tile.classList.add("color--" + sideData[row][col].toLowerCase());
+
+                    if (row === 1 && col === 1) {
+                        const label = document.createElement("span");
+                        label.className = "face-label";
+                        label.textContent = FACE_LABELS[sideName];
+                        tile.appendChild(label);
+                    }
+
+                    faceEl.appendChild(tile);
+                }
+            }
+        });
+    }
+
+    function updateMoveButtonColors() {
+        document.querySelectorAll(".move").forEach(btn => {
+            const baseMove = btn.dataset.move;
+            const face = MOVE_TO_FACE[baseMove];
+
+            // Clear old color classes
+            btn.classList.remove(
+                "color--red",
+                "color--green",
+                "color--yellow",
+                "color--blue",
+                "color--orange",
+                "color--white"
+            );
+
+            // Center sticker defines face color
+            const color = cube[face][1][1].toLowerCase();
+            btn.classList.add("color--" + color);
+        });
+    }
+
+    function renderAll() {
+        render2D();
+        render3D();
+        renderMoveHistory();
+        updateMoveButtonColors();
+    }
+
+    renderAll();
+</script>
+</body>
+</html>
